@@ -1,6 +1,6 @@
 {-# START_FILE package.yaml #-}
 name:                {{name}}
-version:             0.0.0.1
+version:             0.0.0.0
 github:              "{{github-username}}{{^github-username}}githubuser{{/github-username}}/{{name}}"
 license:             BSD3
 author:              "{{author-name}}{{^author-name}}Author name here{{/author-name}}"
