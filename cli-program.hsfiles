@@ -1,0 +1,345 @@
+{-# START_FILE package.yaml #-}
+name:                {{name}}
+version:             0.0.0.0
+github:              "{{github-username}}{{^github-username}}githubuser{{/github-username}}/{{name}}"
+license:             BSD3
+author:              "{{author-name}}{{^author-name}}Author name here{{/author-name}}"
+maintainer:          "{{author-email}}{{^author-email}}example@example.com{{/author-email}}"
+copyright:           "{{copyright}}{{^copyright}}{{year}}{{^year}}2019{{/year}} {{author-name}}{{^author-name}}Author name here{{/author-name}}{{/copyright}}"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+description:         Please see the README on GitHub at <https://github.com/{{github-username}}{{^github-username}}githubuser{{/github-username}}/{{name}}#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- co-log
+- mtl
+- text
+- time
+
+library:
+  source-dirs: src
+
+executables:
+  {{name}}-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - {{name}}
+    - optparse-applicative
+
+tests:
+  {{name}}-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - {{name}}
+
+  {{name}}-doctest:
+    main:                doctest.hs
+    source-dirs:         .
+    ghc-options:
+    - -threaded
+    dependencies:
+    - {{name}}
+    - doctest
+
+{-# START_FILE doctest.hs #-}
+import Test.DocTest
+main = doctest ["-XOverloadedStrings", "-isrc", "src"]
+
+
+{-# START_FILE Setup.hs #-}
+import Distribution.Simple
+main = defaultMain
+
+{-# START_FILE test/Spec.hs #-}
+main :: IO ()
+main = putStrLn "Test suite not yet implemented"
+
+{-# START_FILE src/Commons/Program.hs #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs               #-}
+{-# LANGUAGE MonoLocalBinds             #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings          #-}
+
+module Commons.Program where
+
+import           Colog
+                 ( HasLog(getLogAction, setLogAction)
+                 , LogAction(..)
+                 , Message
+                 , Severity(..)
+                 , WithLog
+                 , cmap
+                 , logError
+                 , msgText
+                 , withLog
+                 )
+import           Colog.Message          (Msg(Msg))
+import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.Reader   (MonadReader, ReaderT, runReaderT)
+import           Data.String            (IsString)
+import qualified Data.Text              as T
+import qualified Data.Text.IO           as TIO
+import           Data.Time              (defaultTimeLocale, formatTime, getZonedTime)
+import           System.Exit            (exitFailure)
+import           System.IO              (stderr)
+
+
+-- | Type definition for a custom program monad.
+newtype ProgramT a = ProgramT { unProgramT :: ReaderT (ProgramEnv ProgramT) IO a }
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (ProgramEnv ProgramT))
+
+
+-- | Type definition for the custom program environment.
+newtype ProgramEnv m = MkProgramEnv { programEnvLogAction :: LogAction m Message }
+
+
+-- | Creates a 'ProgramEnv' with the given DB connection.
+mkProgramEnv :: MonadIO m => ProgramEnv m
+mkProgramEnv = MkProgramEnv logMessageError
+
+
+-- | Runs the program.
+runProgramT :: ProgramEnv ProgramT -> ProgramT a -> IO a
+runProgramT env app = runReaderT (unProgramT app) env
+
+
+-- | Kills the program with an error message.
+killProgram :: (WithLog (ProgramEnv m) Message m, MonadIO m) => T.Text -> m ()
+killProgram msg = logError msg >> liftIO exitFailure
+
+
+-- | Runs an action with a prefixed log message.
+withLogPrefix :: (MonadReader env m, HasLog env Message m) => T.Text -> m a -> m a
+withLogPrefix p = withLog $ cmap (prefixLog p)
+
+
+---------------
+-- INTERNALS --
+---------------
+
+
+-- | 'HasLog' instance for 'ProgramEnv'.
+instance HasLog (ProgramEnv m) Message m where
+  getLogAction :: ProgramEnv m -> LogAction m Message
+  getLogAction = programEnvLogAction
+  {-# INLINE getLogAction #-}
+
+  setLogAction :: LogAction m Message -> ProgramEnv m -> ProgramEnv m
+  setLogAction newLogAction env = env { programEnvLogAction = newLogAction }
+  {-# INLINE setLogAction #-}
+
+
+-- | Provides the log action for a Program program.
+logMessageError :: MonadIO m => LogAction m Message
+logMessageError = LogAction printMessageToErr
+
+
+-- | Pretty prints a log message to standard error
+printMessageToErr :: MonadIO m => Message -> m ()
+printMessageToErr (Msg sev _ txt) = liftIO $ do
+  currFormattedTime <- getCurrentFormattedTime
+  TIO.hPutStrLn stderr $ "[" <> currFormattedTime <> "] " <> severityPrefix sev <> " - " <> txt
+
+
+-- | Returns the current time formatted as @YYYY-MM-DDTHH:mm:ss.sssZ@ (in UTC).
+getCurrentFormattedTime :: MonadIO m => m T.Text
+getCurrentFormattedTime = liftIO $ T.pack . flip (<>) "Z" . take 23 . formatTime defaultTimeLocale "%FT%T%Q" <$> getZonedTime
+
+
+-- | Returns the short-hand form of the log severity.
+severityPrefix :: IsString p => Severity -> p
+severityPrefix Debug   = "D"
+severityPrefix Info    = "I"
+severityPrefix Warning = "W"
+severityPrefix Error   = "E"
+
+
+-- | Adds a prefix to the log message.
+prefixLog :: T.Text -> Message -> Message
+prefixLog x y = y { msgText = x <> " - " <> msgText y }
+
+
+{-# START_FILE src/Programs/DummyProgram.hs #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE MonoLocalBinds    #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+module Programs.DummyProgram where
+
+import Colog                  (Message, WithLog, logInfo)
+import Commons.Program        (ProgramEnv)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+
+
+-- | Provides a dummy program.
+dummyProgram :: (WithLog (ProgramEnv m) Message m, MonadIO m) => Int -> Int -> m ()
+dummyProgram x y = do
+  logInfo "Doing something..."
+  liftIO $ print $ add x y
+  logInfo "Something is done!"
+
+
+-- | Adds two numbers.
+--
+-- >>> add 41 1 :: Int
+-- 42
+-- >>> add 41 1 :: Double
+-- 42.0
+add :: Num a => a -> a -> a
+add = (+)
+
+{-# START_FILE app/Commands/DummyCommand.hs #-}
+module Commands.DummyCommand where
+
+import Commons.Program       (mkProgramEnv, runProgramT)
+import Options.Applicative   (Parser, auto, help, long, metavar, option)
+import Programs.DummyProgram (dummyProgram)
+import System.Exit           (ExitCode, exitSuccess)
+
+
+data Parameters = Parameters
+  { commandParametersA :: !Int
+  , commandParametersB :: !Int
+  } deriving (Show)
+
+
+parseParameters :: Parser Parameters
+parseParameters = Parameters
+  <$> option auto (long "x" <> metavar "X" <> help "X value")
+  <*> option auto (long "y" <> metavar "Y" <> help "Y value")
+
+
+program :: Parameters -> IO ExitCode
+program (Parameters x y) = runProgramT mkProgramEnv (dummyProgram x y) >> exitSuccess
+
+{-# START_FILE app/Main.hs #-}
+module Main where
+
+import qualified Commands.DummyCommand as DummyCommand
+import           Data.Version          (showVersion)
+import           Options.Applicative
+                 ( Parser
+                 , ParserInfo
+                 , command
+                 , execParser
+                 , fullDesc
+                 , header
+                 , help
+                 , helper
+                 , hsubparser
+                 , info
+                 , infoOption
+                 , long
+                 , progDesc
+                 )
+import           Paths_{{name-as-varid}}    (version)
+import           System.Exit           (ExitCode(..), exitWith)
+
+
+main :: IO ()
+main = exitWith =<< (cliProgram =<< execParser cliProgramParserInfo)
+
+
+-- | Parsed command line arguments.
+newtype CliArguments = CliArguments { cliArgumentsCommand :: Command } deriving Show
+
+
+-- | Registry of commands.
+newtype Command = CommandDummy DummyCommand.Parameters deriving Show
+
+
+-- | CLI arguments parser.
+parserProgramOptions :: Parser CliArguments
+parserProgramOptions = CliArguments <$> hsubparser
+  (  command "dummy" (info (CommandDummy <$> DummyCommand.parseParameters) (progDesc "Adds two numbers"))
+  )
+
+
+-- | Version option.
+parserVersionOption :: Parser (a -> a)
+parserVersionOption = infoOption (showVersion version) (long "version" <> help "Show version")
+
+
+-- | CLI program information.
+cliProgramParserInfo :: ParserInfo CliArguments
+cliProgramParserInfo = info
+  (helper <*> parserVersionOption <*> parserProgramOptions)
+  (fullDesc <> progDesc "Program" <> header "program - The Program")
+
+
+-- | CLI program.
+cliProgram :: CliArguments -> IO ExitCode
+cliProgram (CliArguments (CommandDummy params)) = DummyCommand.program params
+
+{-# START_FILE README.md #-}
+# {{name}}
+
+> **TODO:** Provide a useful README.
+
+{-# START_FILE ChangeLog.md #-}
+# Changelog for {{name}}
+
+## Unreleased changes
+
+{-# START_FILE LICENSE #-}
+Copyright {{author-name}}{{^author-name}}Author name here{{/author-name}} (c) {{year}}{{^year}}2019{{/year}}
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * Neither the name of {{author-name}}{{^author-name}}Author name here{{/author-name}} nor the names of other
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+{-# START_FILE .gitignore #-}
+.stack-work/
+*~
+
+{-# START_FILE .editorconfig #-}
+[*]
+
+indent_style = space
+indent_size = 2
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
