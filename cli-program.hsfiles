@@ -194,14 +194,16 @@ prefixLog x y = y { msgText = x <> " - " <> msgText y }
 module Programs.DummyProgram where
 
 import Colog                  (logInfo)
-import Commons.Program        (ProgramC)
+import Commons.Program        (ProgramC, programEnvVariables)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Reader   (asks)
 
 
 -- | Provides a dummy program.
-dummyProgram :: ProgramC () m => Int -> Int -> m ()
-dummyProgram x y = do
+dummyProgram :: ProgramC (Int, Int) m => m ()
+dummyProgram = do
   logInfo "Doing something..."
+  (x, y) <- asks programEnvVariables
   liftIO $ print $ add x y
   logInfo "Something is done!"
 
@@ -237,7 +239,7 @@ parseParameters = Parameters
 
 
 program :: Parameters -> IO ExitCode
-program (Parameters x y) = runProgramT (mkProgramEnv ()) (dummyProgram x y) >> exitSuccess
+program (Parameters x y) = runProgramT (mkProgramEnv (x, y)) dummyProgram >> exitSuccess
 
 {-# START_FILE app/Main.hs #-}
 module Main where
