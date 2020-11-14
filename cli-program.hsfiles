@@ -16,6 +16,7 @@ description:         Please see the README on GitHub at <https://github.com/{{gi
 dependencies:
 - base >= 4.7 && < 5
 - co-log
+- exceptions
 - mtl
 - text
 - time
@@ -69,6 +70,7 @@ main :: IO ()
 main = putStrLn "Test suite not yet implemented"
 
 {-# START_FILE src/Commons/Program.hs #-}
+{-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
@@ -92,6 +94,7 @@ import           Colog
                  , withLog
                  )
 import           Colog.Message          (Msg(Msg))
+import           Control.Monad.Catch    (MonadThrow)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Reader   (MonadReader, ReaderT, runReaderT)
 import           Data.String            (IsString)
@@ -103,26 +106,33 @@ import           System.IO              (stderr)
 
 
 -- | Type definition for a custom program monad.
-newtype ProgramT a = ProgramT { unProgramT :: ReaderT (ProgramEnv ProgramT) IO a }
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadReader (ProgramEnv ProgramT))
+newtype ProgramT vars a = ProgramT { unProgramT :: ReaderT ((ProgramEnv vars) (ProgramT vars)) IO a }
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadReader ((ProgramEnv vars) (ProgramT vars)))
 
 
--- | Type definition for the custom program environment.
-newtype ProgramEnv m = MkProgramEnv { programEnvLogAction :: LogAction m Message }
+-- | Type definition for the parameterized program environment.
+data ProgramEnv a m = MkProgramEnv
+  { programEnvLogAction :: !(LogAction m Message)
+  , programEnvVariables :: !a
+  }
+
+
+-- | Type definition for sub-routine constraint.
+type ProgramC env m = (WithLog (ProgramEnv env m) Message m, MonadIO m, MonadFail m, MonadThrow m)
 
 
 -- | Creates a 'ProgramEnv' with the given DB connection.
-mkProgramEnv :: MonadIO m => ProgramEnv m
+mkProgramEnv :: MonadIO m => vars -> ProgramEnv vars m
 mkProgramEnv = MkProgramEnv logMessageError
 
 
 -- | Runs the program.
-runProgramT :: ProgramEnv ProgramT -> ProgramT a -> IO a
+runProgramT :: (ProgramEnv vars) (ProgramT vars) -> ProgramT vars a -> IO a
 runProgramT env app = runReaderT (unProgramT app) env
 
 
 -- | Kills the program with an error message.
-killProgram :: (WithLog (ProgramEnv m) Message m, MonadIO m) => T.Text -> m ()
+killProgram :: (WithLog (ProgramEnv vars m) Message m, MonadIO m) => T.Text -> m ()
 killProgram msg = logError msg >> liftIO exitFailure
 
 
@@ -137,12 +147,12 @@ withLogPrefix p = withLog $ cmap (prefixLog p)
 
 
 -- | 'HasLog' instance for 'ProgramEnv'.
-instance HasLog (ProgramEnv m) Message m where
-  getLogAction :: ProgramEnv m -> LogAction m Message
+instance HasLog (ProgramEnv vars m) Message m where
+  getLogAction :: ProgramEnv vars m -> LogAction m Message
   getLogAction = programEnvLogAction
   {-# INLINE getLogAction #-}
 
-  setLogAction :: LogAction m Message -> ProgramEnv m -> ProgramEnv m
+  setLogAction :: LogAction m Message -> ProgramEnv vars m -> ProgramEnv vars m
   setLogAction newLogAction env = env { programEnvLogAction = newLogAction }
   {-# INLINE setLogAction #-}
 
@@ -176,7 +186,6 @@ severityPrefix Error   = "E"
 prefixLog :: T.Text -> Message -> Message
 prefixLog x y = y { msgText = x <> " - " <> msgText y }
 
-
 {-# START_FILE src/Programs/DummyProgram.hs #-}
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE MonoLocalBinds    #-}
@@ -184,13 +193,13 @@ prefixLog x y = y { msgText = x <> " - " <> msgText y }
 
 module Programs.DummyProgram where
 
-import Colog                  (Message, WithLog, logInfo)
-import Commons.Program        (ProgramEnv)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Colog                  (logInfo)
+import Commons.Program        (ProgramC)
+import Control.Monad.IO.Class (liftIO)
 
 
 -- | Provides a dummy program.
-dummyProgram :: (WithLog (ProgramEnv m) Message m, MonadIO m) => Int -> Int -> m ()
+dummyProgram :: ProgramC () m => Int -> Int -> m ()
 dummyProgram x y = do
   logInfo "Doing something..."
   liftIO $ print $ add x y
@@ -228,7 +237,7 @@ parseParameters = Parameters
 
 
 program :: Parameters -> IO ExitCode
-program (Parameters x y) = runProgramT mkProgramEnv (dummyProgram x y) >> exitSuccess
+program (Parameters x y) = runProgramT (mkProgramEnv ()) (dummyProgram x y) >> exitSuccess
 
 {-# START_FILE app/Main.hs #-}
 module Main where
