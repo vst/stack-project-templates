@@ -118,7 +118,7 @@ data ProgramEnv a m = MkProgramEnv
 
 
 -- | Type definition for sub-routine constraint.
-type ProgramC env m = (WithLog (ProgramEnv env m) Message m, MonadIO m, MonadFail m, MonadThrow m)
+type ProgramIO env m = (WithLog (ProgramEnv env m) Message m, MonadIO m)
 
 
 -- | Creates a 'ProgramEnv' with the given DB connection.
@@ -194,13 +194,13 @@ prefixLog x y = y { msgText = x <> " - " <> msgText y }
 module Programs.DummyProgram where
 
 import Colog                  (logInfo)
-import Commons.Program        (ProgramC, programEnvVariables)
+import Commons.Program        (ProgramIO, programEnvVariables)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader   (asks)
 
 
 -- | Provides a dummy program.
-dummyProgram :: ProgramC (Int, Int) m => m ()
+dummyProgram :: ProgramIO (Int, Int) m => m ()
 dummyProgram = do
   logInfo "Doing something..."
   (x, y) <- asks programEnvVariables
