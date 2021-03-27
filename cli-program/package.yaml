@@ -20,10 +20,13 @@ flags:
 
 dependencies:
 - base >= 4.11 && < 5
-- optparse-applicative
 
-ghc-options:
-- -Wall
+library:
+  source-dirs:      src
+  ghc-options:
+  - -Wall
+  default-extensions:
+  - OverloadedStrings
 
 executable:
   main:             Main.hs
@@ -32,6 +35,9 @@ executable:
   - -threaded
   - -rtsopts
   - -with-rtsopts=-N
+  dependencies:
+  - {{name}}
+  - optparse-applicative
   when:
   - condition:      "flag(static) && !(os(osx))"
     ld-options:
@@ -45,4 +51,5 @@ tests:
     ghc-options:
     - -threaded
     dependencies:
+    - {{name}}
     - doctest

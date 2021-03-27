@@ -4,9 +4,8 @@
 
 ## Usage
 
-There are 3 templates:
+There are 2 templates:
 
-1. [apponly](./apponly.hsfiles)
 1. [bare](./bare.hsfiles)
 1. [cli-program](./cli-program.hsfiles)
 
@@ -19,7 +18,7 @@ stack new <NAME> vst/<TEMPLATE>
 For example, you can create a new project `my-project`:
 
 ```
-stack new my-project vst/apponly
+stack new my-project vst/cli-program
 ```
 
 ... and then, use `stack` to continue with development:
@@ -45,5 +44,5 @@ can compile them into a single `.hsfiles` file by running
 `./create-hsfiles.sh` script. For example:
 
 ```
-./create-hsfiles.sh apponly > apponly.hsfiles
+./create-hsfiles.sh cli-program > cli-program.hsfiles
 ```

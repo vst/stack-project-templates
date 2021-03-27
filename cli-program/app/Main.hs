@@ -1,6 +1,7 @@
 module Main where
 
 import           Data.Version        (showVersion)
+import           Lib                 (greeting)
 import qualified Options.Applicative as OA
 import           Paths_{{name}}      (version)
 import           System.Exit         (ExitCode, exitSuccess, exitWith)
@@ -13,8 +14,8 @@ main = exitWith =<< (cliProgram =<< OA.execParser cliProgramParserInfo)
 
 -- | CLI program.
 cliProgram :: CliArguments -> IO ExitCode
-cliProgram (CliArguments (CommandCmd1 w))      = putStrLn ("Hello " <> w <> "!") >> exitSuccess
-cliProgram (CliArguments (CommandCmd2 (g, w))) = putStrLn (g <> " " <> w <> "!") >> exitSuccess
+cliProgram (CliArguments (CommandCmd1 w))      = greeting "Hello" w >> exitSuccess
+cliProgram (CliArguments (CommandCmd2 (g, w))) = greeting g w >> exitSuccess
 
 
 -- | Registry of commands and their arguments.
