@@ -2,3 +2,5 @@ apponly:
   description: cabal and stack compatible, application only template
 bare:
   description: Based on new-template with extra goodies
+cli-program:
+  description: Simple CLI program template
