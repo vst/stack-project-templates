@@ -1,0 +1,48 @@
+name:               {{name}}
+version:            0.0.0.0
+github:             "{{github-username}}{{^github-username}}CHANGE ME: githubuser{{/github-username}}/{{name}}"
+license:            MIT
+author:             "{{author-name}}{{^author-name}}CHANGE ME: Author name here{{/author-name}}"
+maintainer:         "{{author-email}}{{^author-email}}CHANGE ME: example@example.com{{/author-email}}"
+copyright:          "{{copyright}}{{^copyright}}{{year}}{{^year}}2021{{/year}} {{author-name}}{{^author-name}}CHANGE ME: Author name here{{/author-name}}{{/copyright}}"
+
+description:        Please see the README on GitHub at <https://github.com/{{github-username}}{{^github-username}}githubuser{{/github-username}}/{{name}}#readme>
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+flags:
+  static:
+    description:    Use static linking for the main executable
+    default:        false
+    manual:         true
+
+dependencies:
+- base >= 4.11 && < 5
+- optparse-applicative
+
+ghc-options:
+- -Wall
+
+executable:
+  main:             Main.hs
+  source-dirs:      app
+  ghc-options:
+  - -threaded
+  - -rtsopts
+  - -with-rtsopts=-N
+  when:
+  - condition:      "flag(static) && !(os(osx))"
+    ld-options:
+    - -static
+    - -pthread
+
+tests:
+  {{name}}-doctest:
+    main:           doctest.hs
+    source-dirs:    .
+    ghc-options:
+    - -threaded
+    dependencies:
+    - doctest
