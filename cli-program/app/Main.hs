@@ -3,7 +3,7 @@ module Main where
 import           Data.Version        (showVersion)
 import           Lib                 (greeting)
 import qualified Options.Applicative as OA
-import           Paths_{{name}}      (version)
+import           Paths_{{name-as-varid}}     (version)
 import           System.Exit         (ExitCode, exitSuccess, exitWith)
 
 
