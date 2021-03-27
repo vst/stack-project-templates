@@ -27,6 +27,7 @@ stack new my-project vst/cli-program
 cd my-project
 stack run
 stack test
+stack haddock
 ```
 
 ... or, use `cabal` to continue with development:
@@ -35,6 +36,7 @@ stack test
 cd my-project
 cabal run my-project
 cabal test
+cabal haddock
 ```
 
 ## Rebuilding Templates
