@@ -1,3 +1,5 @@
+-- | This is a sample library module.
+--
 module Lib where
 
 

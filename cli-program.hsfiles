@@ -192,6 +192,8 @@ tests:
 > **TODO:** Provide a complete README.
 
 {-# START_FILE src/Lib.hs #-}
+-- | This is a sample library module.
+--
 module Lib where
 
 
