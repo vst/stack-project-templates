@@ -47,7 +47,7 @@ executable:
 tests:
   {{name}}-doctest:
     main:           doctest.hs
-    source-dirs:    .
+    source-dirs:    test
     ghc-options:
     - -threaded
     dependencies:
