@@ -45,6 +45,14 @@ executable:
     - -pthread
 
 tests:
+  {{name}}-test:
+    main:           Main.hs
+    source-dirs:    test
+    ghc-options:
+    - -threaded
+    dependencies:
+    - {{name}}
+
   {{name}}-doctest:
     main:           doctest.hs
     source-dirs:    test

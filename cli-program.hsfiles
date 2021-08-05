@@ -64,13 +64,6 @@ parserVersionOption = OA.infoOption (showVersion version) (OA.long "version" <> 
 {-# START_FILE CHANGELOG.md #-}
 # CHANGELOG
 
-{-# START_FILE doctest.hs #-}
-import Test.DocTest
-
-
-main :: IO ()
-main = doctest ["-XOverloadedStrings", "-isrc", "src"]
-
 {-# START_FILE .editorconfig #-}
 [*]
 
@@ -177,9 +170,17 @@ executable:
     - -pthread
 
 tests:
+  {{name}}-test:
+    main:           Main.hs
+    source-dirs:    test
+    ghc-options:
+    - -threaded
+    dependencies:
+    - {{name}}
+
   {{name}}-doctest:
     main:           doctest.hs
-    source-dirs:    .
+    source-dirs:    test
     ghc-options:
     - -threaded
     dependencies:
@@ -481,3 +482,16 @@ newline: native
 # Default: true
 cabal: true
 
+{-# START_FILE test/doctest.hs #-}
+import Test.DocTest
+
+
+main :: IO ()
+main = doctest ["-XOverloadedStrings", "-isrc", "src"]
+
+{-# START_FILE test/Main.hs #-}
+module Main where
+
+
+main :: IO ()
+main = putStrLn "Test it!"
